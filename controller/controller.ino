@@ -7,41 +7,48 @@ const char *WIFI_SSID = "Not4U";
 const char *WIFI_PASS = "123PakeHuruf";
 
 const int servoPin = 14;
-const int infraredPin = 26; // Pin untuk sensor infrared
-int IROutput;
+const int irPin = 26;
+
+int servoValue;
+// int irValue = digitalRead(irPin);
+
 Servo myservo;
 AsyncWebServer server(80);
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
 
   myservo.attach(servoPin);
-  pinMode(infraredPin, INPUT);
+  pinMode(irPin, INPUT);
 
+  // Setup WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
   }
   Serial.println("http://");
   Serial.println(WiFi.localIP());
 
-  server.on("/open-gate", HTTP_GET, [](AsyncWebServerRequest *request) {
-    IROutput = digitalRead(infraredPin);
-    if (IROutput == LOW) {
-      myservo.write(90);
-      delay(1000);
-      myservo.write(0);
-      Serial.print("Gate Opened");
-      request->send(200, "text/plain", "Gate Opened");
-    } else {
-      Serial.print("Not Detected");
-      request->send(200, "text/plain", "Infrared not detected, unable to open gate");
-    }
-  });
+  server.on("/check-infrared", HTTP_GET, [](AsyncWebServerRequest *request){
+    int irValue = digitalRead(irPin);
+    Serial.println(irValue);
+    String irValueString = String(irValue);
+    request->send(200, "text/plain", irValueString);});
 
+  server.on("/open-gate", HTTP_GET, [](AsyncWebServerRequest *request){
+    myservo.write(90);
+    Serial.println("Buka Gerbang");
+    request->send(200, "text/plain", "Gate Opened"); });
+
+  server.on("/close-gate", HTTP_GET, [](AsyncWebServerRequest *request){
+    myservo.write(0);
+    Serial.println("Tutup Gerbang");
+    request->send(200, "text/plain", "Gate Closed"); });
   server.begin();
 }
 
-void loop() {
+void loop()
+{
 }
-

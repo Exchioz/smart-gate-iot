@@ -24,8 +24,9 @@ app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'gaiot'
 
-urlesp32cam = 'http://192.168.1.41'
+# urlesp32cam = 'http://192.168.1.41'
 urlesp32 = 'http://192.168.1.38'
+latest_qr_code = None
 
 with app.app_context():
     cursor = mysql.connection.cursor()
@@ -40,43 +41,57 @@ def handle_connect():
 def handle_disconnect():
     print('Client disconnected')
 
-latest_qr_code = None
 @socketio.on('get_qr_code')
 def get_latest_qr_code():
     socketio.emit('latest_qr_code', {'data': latest_qr_code})
 
 def move_servo():
-    requests.get(urlesp32+'/open-gate')
+    while True:
+        ir_value_response = requests.get(urlesp32 + '/check-infrared')
+        ir_value = int(ir_value_response.text)
+        print("Infrared Value:", ir_value)
+
+        if ir_value == 0:
+            print("Opening Gate")
+            requests.get(urlesp32 + '/open-gate')
+        elif ir_value == 1:
+            time.sleep(2)
+            print("Closing Gate")
+            requests.get(urlesp32 + '/close-gate')
+            break
+
+        time.sleep(1)
 
 def qr_code_detection():
-    #cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     font = cv2.FONT_HERSHEY_PLAIN
-    prev=""
-    data=""
+    prev = ""
+    data = ""
 
     while True:
-        img_resp=urllib.request.urlopen(urlesp32cam+'/cam-mid.jpg')
-        imgnp=np.array(bytearray(img_resp.read()),dtype=np.uint8)
-        frame=cv2.imdecode(imgnp,-1)
-        #_, frame = cap.read()
+        # img_resp=urllib.request.urlopen(urlesp32cam+'/cam-mid.jpg')
+        # imgnp=np.array(bytearray(img_resp.read()),dtype=np.uint8)
+        # frame=cv2.imdecode(imgnp,-1)
+        _, frame = cap.read()
 
         decodedObjects = pyzbar.decode(frame)
         for obj in decodedObjects:
             data = obj.data.decode('utf-8')
-            if prev == data:
-                pass
-            else:
-                print("Data: ", data)
-                user_id = check_token_in_database(data)
-                if check_token_in_database(data):
-                    global latest_qr_code
-                    latest_qr_code = data
-                    socketio.emit('alert', {'message': 'QR Code Detected!'})
-                    threading.Thread(target=move_servo).start()
-                    add_to_activity(user_id)
-                prev=data
-            cv2.putText(frame, str(data), (50, 50), font, 2,
-                        (255, 0, 0), 3)
+            if prev != data:
+                ir_value_response = requests.get(urlesp32 + '/check-infrared')
+                ir_value = int(ir_value_response.text)
+
+                if ir_value == 0:
+                    print("Data: ", data)
+                    user_id = check_token_in_database(data)
+                    if check_token_in_database(data):
+                        global latest_qr_code
+                        latest_qr_code = data
+                        socketio.emit('alert', {'message': 'QR Code Detected, Silahkan Masuk!'})
+                        threading.Thread(target=move_servo).start()
+                        add_to_activity(user_id)
+
+            cv2.putText(frame, str(data), (50, 50), font, 2, (255, 0, 0), 3)
 
         cv2.imshow("Live Transmission", frame)
 
@@ -85,6 +100,7 @@ def qr_code_detection():
             break
 
     cv2.destroyAllWindows()
+
 
 def check_token_in_database(token):
     with app.app_context():
