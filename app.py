@@ -12,10 +12,10 @@ from datetime import datetime
 import time
 import urllib.request
 from flask import Flask
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
-
 mysql = MySQL(app)
 socketio = SocketIO(app)
 
@@ -23,6 +23,9 @@ app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'gaiot'
+
+urlesp32cam = 'http://192.168.1.41'
+urlesp32 = 'http://192.168.1.38'
 
 with app.app_context():
     cursor = mysql.connection.cursor()
@@ -42,15 +45,17 @@ latest_qr_code = None
 def get_latest_qr_code():
     socketio.emit('latest_qr_code', {'data': latest_qr_code})
 
+def move_servo():
+    requests.get(urlesp32+'/open-gate')
+
 def qr_code_detection():
     #cap = cv2.VideoCapture(0)
     font = cv2.FONT_HERSHEY_PLAIN
-    url='http://192.168.1.12/'
     prev=""
     data=""
 
     while True:
-        img_resp=urllib.request.urlopen(url+'cam-mid.jpg')
+        img_resp=urllib.request.urlopen(urlesp32cam+'/cam-mid.jpg')
         imgnp=np.array(bytearray(img_resp.read()),dtype=np.uint8)
         frame=cv2.imdecode(imgnp,-1)
         #_, frame = cap.read()
@@ -67,6 +72,7 @@ def qr_code_detection():
                     global latest_qr_code
                     latest_qr_code = data
                     socketio.emit('alert', {'message': 'QR Code Detected!'})
+                    threading.Thread(target=move_servo).start()
                     add_to_activity(user_id)
                 prev=data
             cv2.putText(frame, str(data), (50, 50), font, 2,
@@ -95,7 +101,6 @@ def add_to_activity(user_id):
         mysql.connection.commit()
         time.sleep(5)
         
-
 class EventScheduler:
     def __init__(self, db):
         self.db = db
@@ -201,8 +206,6 @@ def qr_code():
 def logout():
     session.clear()
     return redirect(url_for('login'))
-
-
 
 if __name__ == '__main__':
     qr_thread = threading.Thread(target=qr_code_detection)

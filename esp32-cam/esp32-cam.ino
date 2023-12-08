@@ -71,6 +71,7 @@ void  setup(){
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
+    
   }
   Serial.print("http://");
   Serial.println(WiFi.localIP());
