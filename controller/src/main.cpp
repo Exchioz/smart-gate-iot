@@ -27,22 +27,27 @@ void setup()
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
+    Serial.println("Connecting to WiFi..");
   }
+  Serial.println("Connected to WiFi network");
   Serial.println("http://");
   Serial.println(WiFi.localIP());
 
-  server.on("/check-infrared", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/check-infrared", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
     int irValue = digitalRead(irPin);
     Serial.println(irValue);
     String irValueString = String(irValue);
-    request->send(200, "text/plain", irValueString);});
+    request->send(200, "text/plain", irValueString); });
 
-  server.on("/open-gate", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/open-gate", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
     myservo.write(90);
     Serial.println("Buka Gerbang");
     request->send(200, "text/plain", "Gate Opened"); });
 
-  server.on("/close-gate", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/close-gate", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
     myservo.write(0);
     Serial.println("Tutup Gerbang");
     request->send(200, "text/plain", "Gate Closed"); });

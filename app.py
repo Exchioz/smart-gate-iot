@@ -63,16 +63,16 @@ def move_servo():
         time.sleep(1)
 
 def qr_code_detection():
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(1) #jika ingin menggunakan webcam
     font = cv2.FONT_HERSHEY_PLAIN
     prev = ""
     data = ""
 
     while True:
-        # img_resp=urllib.request.urlopen(urlesp32cam+'/cam-mid.jpg')
-        # imgnp=np.array(bytearray(img_resp.read()),dtype=np.uint8)
-        # frame=cv2.imdecode(imgnp,-1)
-        _, frame = cap.read()
+        # img_resp=urllib.request.urlopen(urlesp32cam+'/cam-mid.jpg') #jika ingin menggunakan esp32cam
+        # imgnp=np.array(bytearray(img_resp.read()),dtype=np.uint8)   #jika ingin menggunakan esp32cam
+        # frame=cv2.imdecode(imgnp,-1)                                #jika ingin menggunakan esp32cam
+        _, frame = cap.read() #jika ingin menggunakan webcam
 
         decodedObjects = pyzbar.decode(frame)
         for obj in decodedObjects:
@@ -226,4 +226,5 @@ def logout():
 if __name__ == '__main__':
     qr_thread = threading.Thread(target=qr_code_detection)
     qr_thread.start()
-    socketio.run(app)
+    socketio.run(app, host='192.168.1.3', port=5000)
+    app.run(debug=True)
