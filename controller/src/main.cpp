@@ -3,14 +3,14 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
-const char *WIFI_SSID = "Not4U";
-const char *WIFI_PASS = "123PakeHuruf";
+const char *WIFI_SSID = "Edu_Robotics";
+const char *WIFI_PASS = "labrobot21";
 
 const int servoPin = 14;
-const int irPin = 26;
+const int trigPin = 26;
+const int echoPin = 27;
 
 int servoValue;
-// int irValue = digitalRead(irPin);
 
 Servo myservo;
 AsyncWebServer server(80);
@@ -20,7 +20,8 @@ void setup()
   Serial.begin(115200);
 
   myservo.attach(servoPin);
-  pinMode(irPin, INPUT);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
 
   // Setup WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -33,20 +34,30 @@ void setup()
   Serial.println("http://");
   Serial.println(WiFi.localIP());
 
-  server.on("/check-infrared", HTTP_GET, [](AsyncWebServerRequest *request)
+  server.on("/check-ultrasonic", HTTP_GET, [](AsyncWebServerRequest *request)
             {
-    int irValue = digitalRead(irPin);
-    Serial.println(irValue);
-    String irValueString = String(irValue);
-    request->send(200, "text/plain", irValueString); });
+    long duration, jarak;
+  
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+  
+    duration = pulseIn(echoPin, HIGH);
+    jarak = (duration * 0.0343) / 2;
 
-  server.on("/open-gate", HTTP_GET, [](AsyncWebServerRequest *request)
+    int jarakInt = static_cast<int>(jarak);
+    String jarakString = String(jarakInt);
+    request->send(200, "text/plain", jarakString); });
+
+  server.on("/open-gate", HTTP_POST, [](AsyncWebServerRequest *request)
             {
     myservo.write(90);
     Serial.println("Buka Gerbang");
     request->send(200, "text/plain", "Gate Opened"); });
 
-  server.on("/close-gate", HTTP_GET, [](AsyncWebServerRequest *request)
+  server.on("/close-gate", HTTP_POST, [](AsyncWebServerRequest *request)
             {
     myservo.write(0);
     Serial.println("Tutup Gerbang");

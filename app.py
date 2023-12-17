@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, Response, render_template, request, redirect, url_for, session, jsonify
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
 import string
@@ -13,6 +13,7 @@ import time
 import urllib.request
 from flask import Flask
 import requests
+import config
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -24,8 +25,6 @@ app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'gaiot'
 
-# urlesp32cam = 'http://192.168.1.41'
-urlesp32 = 'http://192.168.1.38'
 latest_qr_code = None
 
 with app.app_context():
@@ -45,55 +44,71 @@ def handle_disconnect():
 def get_latest_qr_code():
     socketio.emit('latest_qr_code', {'data': latest_qr_code})
 
+def chceck_infrared():
+    ultrasonic_value_response = requests.get(config.urlesp32 + '/check-ultrasonic')
+    return int(ultrasonic_value_response.text)
+
+
 def move_servo():
     while True:
-        ir_value_response = requests.get(urlesp32 + '/check-infrared')
-        ir_value = int(ir_value_response.text)
-        print("Infrared Value:", ir_value)
-
-        if ir_value == 0:
+        jarak = chceck_infrared()
+        print("Ultrasonic Value:", jarak)
+        
+        if jarak > 10:
             print("Opening Gate")
-            requests.get(urlesp32 + '/open-gate')
-        elif ir_value == 1:
-            time.sleep(2)
+            requests.post(config.urlesp32 + '/open-gate')
+        elif jarak <= 10:
+            while jarak <= 10:
+                print("Car still detected. Waiting for it to pass...")
+                time.sleep(1)
+                jarak = chceck_infrared()
+                
             print("Closing Gate")
-            requests.get(urlesp32 + '/close-gate')
+            requests.post(config.urlesp32 + '/close-gate')
+            time.sleep(2)
             break
 
         time.sleep(1)
 
 def qr_code_detection():
-    cap = cv2.VideoCapture(1) #jika ingin menggunakan webcam
+    cap = cv2.VideoCapture(0) #WEBCAM
     font = cv2.FONT_HERSHEY_PLAIN
     prev = ""
     data = ""
 
     while True:
-        # img_resp=urllib.request.urlopen(urlesp32cam+'/cam-mid.jpg') #jika ingin menggunakan esp32cam
-        # imgnp=np.array(bytearray(img_resp.read()),dtype=np.uint8)   #jika ingin menggunakan esp32cam
-        # frame=cv2.imdecode(imgnp,-1)                                #jika ingin menggunakan esp32cam
-        _, frame = cap.read() #jika ingin menggunakan webcam
+        #ESP32-CAM
+        # img_resp=urllib.request.urlopen(config.urlesp32cam+'/cam-mid.jpg')
+        # imgnp=np.array(bytearray(img_resp.read()),dtype=np.uint8)
+        # frame=cv2.imdecode(imgnp,-1)
+
+        #WEBCAM
+        _, frame = cap.read()
 
         decodedObjects = pyzbar.decode(frame)
         for obj in decodedObjects:
             data = obj.data.decode('utf-8')
             if prev != data:
-                ir_value_response = requests.get(urlesp32 + '/check-infrared')
-                ir_value = int(ir_value_response.text)
+                # ultrasonic_value_response = requests.get(config.urlesp32 + '/check-ultrasonic')
+                # jarak = int(ultrasonic_value_response.text)
 
-                if ir_value == 0:
-                    print("Data: ", data)
-                    user_id = check_token_in_database(data)
-                    if check_token_in_database(data):
-                        global latest_qr_code
-                        latest_qr_code = data
-                        socketio.emit('alert', {'message': 'QR Code Detected, Silahkan Masuk!'})
-                        threading.Thread(target=move_servo).start()
-                        add_to_activity(user_id)
+                # if jarak == 0:
+                print("Data: ", data)
+                user_id = check_token_in_database(data)
+                if check_token_in_database(data):
+                    global latest_qr_code
+                    latest_qr_code = data
+                    socketio.emit('alert', {'message': 'QR Code Detected, Silahkan Masuk!'})
+                    threading.Thread(target=move_servo).start()
+                    add_to_activity(user_id)
 
             cv2.putText(frame, str(data), (50, 50), font, 2, (255, 0, 0), 3)
 
-        cv2.imshow("Live Transmission", frame)
+        # cv2.imshow("Live Transmission", frame)
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
         key = cv2.waitKey(1)
         if key == 27:
@@ -153,11 +168,15 @@ class EventScheduler:
         self.db.cursor().execute(update_token_query)
         self.db.commit()
     
+    @staticmethod
     def generate_unique_token():
         N = 15
         res = ''.join(random.choices(string.ascii_letters, k=N))
         return str(res)
 
+@app.route('/video_feed')
+def video_feed():
+    return Response(qr_code_detection(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -218,6 +237,10 @@ def qr_code():
     else:
         return redirect(url_for('login'))
 
+@app.route('/admin')
+def admin():
+    return render_template('admin.html')
+
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():
     session.clear()
@@ -226,5 +249,7 @@ def logout():
 if __name__ == '__main__':
     qr_thread = threading.Thread(target=qr_code_detection)
     qr_thread.start()
-    socketio.run(app, host='192.168.1.3', port=5000)
-    app.run(debug=True)
+    try:
+        socketio.run(app, host="0.0.0.0", port=5000)
+    finally:
+        socketio.close()
