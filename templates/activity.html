@@ -23,15 +23,30 @@
             </div>
             <div class="row justify-content-center mx-auto">
                 <div class="login-wrap p-4 p-md-5">
-                    <h3 class="text-center mb-4">Live Camera</h3>
+                    <h3 class="text-center mb-4">Activity</h3>
                     <div class="d-flex justify-content-center">
-                        <img src="{{ url_for('video_feed') }}" width="auto" height="auto" />
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Nama</th>
+                                    <th>Scanned Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in activities %}
+                                <tr>
+                                    <td>{{ activity.no }}</td>
+                                    <td>{{ activity.user_name }}</td>
+                                    <td>{{ activity.scanned_time }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="d-flex justify-content-center my-3">
-                        <button type="submit" class="btn btn-primary btn-lg btn-block rounded submit mx-2">
-                            <a href="{{ url_for('activity') }}" class="text-white text-decoration-none">Activity</a>
-                        </button>
-                    </div>
+                </div>
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('admin') }}">Kembali</a>
                 </div>
             </div>
         </div>

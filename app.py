@@ -58,7 +58,7 @@ def move_servo():
             print("Opening Gate")
             requests.post(config.urlesp32 + '/open-gate')
         elif jarak <= 10:
-            while jarak <= 10:
+            while jarak <= 10:  
                 print("Car still detected. Waiting for it to pass...")
                 time.sleep(1)
                 jarak = chceck_infrared()
@@ -240,6 +240,31 @@ def qr_code():
 @app.route('/admin')
 def admin():
     return render_template('admin.html')
+
+@app.route('/activity')
+def activity():
+    cursor = mysql.connection.cursor()
+    sql_query = "SELECT * FROM activity"
+    cursor.execute(sql_query)
+    result = cursor.fetchall()
+    activities = []
+    no = 1
+
+    for row in result:
+        nama_query = f"SELECT nama FROM users WHERE id = {row[1]}"
+        cursor.execute(nama_query)
+        nama_result = cursor.fetchone()
+
+        activities.append({
+            "no" : no,
+            "user_name": nama_result[0] if nama_result else "Unknown",  # Gunakan "Unknown" jika nama tidak ditemukan
+            "scanned_time": row[2]
+        })
+        no += 1
+
+    cursor.close()
+    
+    return render_template("activity.html", activities=activities)
 
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():

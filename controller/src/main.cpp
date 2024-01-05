@@ -3,8 +3,8 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
-const char *WIFI_SSID = "Edu_Robotics";
-const char *WIFI_PASS = "labrobot21";
+const char *WIFI_SSID = "Bams";
+const char *WIFI_PASS = "aksyalbams";
 
 const int servoPin = 14;
 const int trigPin = 26;
